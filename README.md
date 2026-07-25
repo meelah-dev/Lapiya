@@ -118,7 +118,6 @@ Create a `.env` file in the `backend` root:
 ```env
 DATABASE_URL=postgres://<user>:<password>@localhost:5432/lafiya
 GOOGLE_GENAI_API_KEY=your_google_ai_studio_api_key_here
-GEMINI_API_KEY=your_google_ai_studio_api_key_here
 PORT=3000
 ```
 

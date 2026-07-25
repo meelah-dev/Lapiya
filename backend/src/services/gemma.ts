@@ -7,9 +7,9 @@ dotenv.config();
 const OLLAMA_URL = process.env.OLLAMA_URL || 'http://localhost:11434';
 const GEMMA_MODEL = process.env.GEMMA_MODEL || 'gemma2:9b';
 
-// Gemini API Helpers
-async function queryGemini(promptText: string): Promise<string | null> {
-  const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_GENAI_API_KEY;
+// Gemma Cloud API Helpers
+async function queryGemmaAPI(promptText: string): Promise<string | null> {
+  const apiKey = process.env.GOOGLE_GENAI_API_KEY;
   if (!apiKey) return null;
   try {
     const genAI = new GoogleGenerativeAI(apiKey);
@@ -18,16 +18,16 @@ async function queryGemini(promptText: string): Promise<string | null> {
     const response = await result.response;
     return response.text().trim();
   } catch (err) {
-    console.error('[Gemini] Generation failed:', err);
+    console.error('[Gemma Cloud API] Generation failed:', err);
     return null;
   }
 }
 
-async function queryGeminiVision(
+async function queryGemmaAPIVision(
   base64Image: string,
   promptText: string
 ): Promise<string | null> {
-  const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_GENAI_API_KEY;
+  const apiKey = process.env.GOOGLE_GENAI_API_KEY;
   if (!apiKey) return null;
   try {
     const genAI = new GoogleGenerativeAI(apiKey);
@@ -44,7 +44,7 @@ async function queryGeminiVision(
     const response = await result.response;
     return response.text().trim();
   } catch (err) {
-    console.error('[Gemini Vision] Generation failed:', err);
+    console.error('[Gemma Cloud API Vision] Generation failed:', err);
     return null;
   }
 }
@@ -175,11 +175,11 @@ export async function generateGemmaResponse(prompt: {
   
   const fullPrompt = `${systemPrompt}\n\nContext: ${prompt.retrievedContext}\n\n${userProfile}\n\nUser Question: ${prompt.message}\n\nLafiya:`;
 
-  // Try Gemini API first if configured
-  if (process.env.GEMINI_API_KEY || process.env.GOOGLE_GENAI_API_KEY) {
-    const geminiRes = await queryGemini(fullPrompt);
-    if (geminiRes) {
-      return geminiRes;
+  // Try Cloud Gemma API first if configured
+  if (process.env.GOOGLE_GENAI_API_KEY) {
+    const cloudRes = await queryGemmaAPI(fullPrompt);
+    if (cloudRes) {
+      return cloudRes;
     }
   }
 
@@ -448,19 +448,19 @@ export async function analyzeDiagnosticImage(
 }
 Speak in simple ${isHausa ? 'Hausa' : 'English'}. For critical warnings (e.g. positive malaria, high urine protein 2+ suggesting preeclampsia risk), urgency MUST be 'critical'. Do not output any thinking or markdown block, output only raw JSON.`;
 
-  // Try Gemini Vision API first if configured
-  if (process.env.GEMINI_API_KEY || process.env.GOOGLE_GENAI_API_KEY) {
+  // Try Cloud Gemma Vision API first if configured
+  if (process.env.GOOGLE_GENAI_API_KEY) {
     try {
-      const geminiRes = await queryGeminiVision(base64Image, systemPrompt);
-      if (geminiRes) {
-        const jsonStr = geminiRes.replace(/```json\s*|```/g, '').trim();
+      const gemmaRes = await queryGemmaAPIVision(base64Image, systemPrompt);
+      if (gemmaRes) {
+        const jsonStr = gemmaRes.replace(/```json\s*|```/g, '').trim();
         const parsed = JSON.parse(jsonStr);
         if (parsed.testType && parsed.result && parsed.urgency && parsed.actionSteps) {
           return parsed;
         }
       }
     } catch (err) {
-      console.error('[Gemini Vision] Image triage parsing failed, falling back:', err);
+      console.error('[Gemma Cloud Vision] Image triage parsing failed, falling back:', err);
     }
   }
 
