@@ -1,53 +1,10 @@
 import dotenv from 'dotenv';
-import { GoogleGenerativeAI } from '@google/generative-ai';
 import { queryKnowledgeBase } from './rag';
 
 dotenv.config();
 
 const OLLAMA_URL = process.env.OLLAMA_URL || 'http://localhost:11434';
 const GEMMA_MODEL = process.env.GEMMA_MODEL || 'gemma2:9b';
-
-// Gemma Cloud API Helpers
-async function queryGemmaAPI(promptText: string): Promise<string | null> {
-  const apiKey = process.env.GOOGLE_GENAI_API_KEY;
-  if (!apiKey) return null;
-  try {
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
-    const result = await model.generateContent(promptText);
-    const response = await result.response;
-    return response.text().trim();
-  } catch (err) {
-    console.error('[Gemma Cloud API] Generation failed:', err);
-    return null;
-  }
-}
-
-async function queryGemmaAPIVision(
-  base64Image: string,
-  promptText: string
-): Promise<string | null> {
-  const apiKey = process.env.GOOGLE_GENAI_API_KEY;
-  if (!apiKey) return null;
-  try {
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
-    const result = await model.generateContent([
-      promptText,
-      {
-        inlineData: {
-          data: base64Image.replace(/^data:image\/\w+;base64,/, ''),
-          mimeType: 'image/png'
-        }
-      }
-    ]);
-    const response = await result.response;
-    return response.text().trim();
-  } catch (err) {
-    console.error('[Gemma Cloud API Vision] Generation failed:', err);
-    return null;
-  }
-}
 
 // Bundled Primary Health Center database (Offline Architecture)
 export interface HealthCenter {
@@ -174,14 +131,6 @@ export async function generateGemmaResponse(prompt: {
   const userProfile = `User Profile: LGA: ${prompt.lga}, Trimester: ${prompt.trimester}, Language: ${prompt.language}`;
   
   const fullPrompt = `${systemPrompt}\n\nContext: ${prompt.retrievedContext}\n\n${userProfile}\n\nUser Question: ${prompt.message}\n\nLafiya:`;
-
-  // Try Cloud Gemma API first if configured
-  if (process.env.GOOGLE_GENAI_API_KEY) {
-    const cloudRes = await queryGemmaAPI(fullPrompt);
-    if (cloudRes) {
-      return cloudRes;
-    }
-  }
 
   const isAvailable = await isOllamaAvailable();
   if (isAvailable) {
@@ -447,22 +396,6 @@ export async function analyzeDiagnosticImage(
   "actionSteps": ["Action step 1", "Action step 2"]
 }
 Speak in simple ${isHausa ? 'Hausa' : 'English'}. For critical warnings (e.g. positive malaria, high urine protein 2+ suggesting preeclampsia risk), urgency MUST be 'critical'. Do not output any thinking or markdown block, output only raw JSON.`;
-
-  // Try Cloud Gemma Vision API first if configured
-  if (process.env.GOOGLE_GENAI_API_KEY) {
-    try {
-      const gemmaRes = await queryGemmaAPIVision(base64Image, systemPrompt);
-      if (gemmaRes) {
-        const jsonStr = gemmaRes.replace(/```json\s*|```/g, '').trim();
-        const parsed = JSON.parse(jsonStr);
-        if (parsed.testType && parsed.result && parsed.urgency && parsed.actionSteps) {
-          return parsed;
-        }
-      }
-    } catch (err) {
-      console.error('[Gemma Cloud Vision] Image triage parsing failed, falling back:', err);
-    }
-  }
 
   const isAvailable = await isOllamaAvailable();
   if (isAvailable) {
